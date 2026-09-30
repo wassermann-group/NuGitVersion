@@ -1,0 +1,51 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<PropertyGroup Condition="'$(GenerateAssemblyInfo)' == ''">
+		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+		<GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+		<GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+		<GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<FilesToCopy Include="$(MSBuildThisFileDirectory)..\content\nugitversion.json"
+					 Condition="!Exists('$(MSBuildProjectDirectory)\nugitversion.json')" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Include nugitversion.json as AdditionalFile -->
+		<AdditionalFiles Include="$(MSBuildProjectDirectory)\nugitversion.json" />
+	</ItemGroup>
+
+	<Target Name="GenerateVersionInfo" BeforeTargets="BeforeCompile">
+		<!-- Copy nugitversion.json if not yet present in the project -->
+		<Copy SourceFiles="@(FilesToCopy)"
+			  DestinationFiles="@(FilesToCopy->'$(MSBuildProjectDirectory)\nugitversion.json')" />
+
+		<PropertyGroup>
+			<NuGitToolDll>$(MSBuildThisFileDirectory)..\tools\NuGitVersion.Tool.dll</NuGitToolDll>
+			<!-- Strip the trailing backslash, otherwise it escapes the closing quote on Windows -->
+			<NuGitIntermediateDir>$(IntermediateOutputPath.TrimEnd('\').TrimEnd('/'))</NuGitIntermediateDir>
+			<NuGitToolCommand>dotnet "$(NuGitToolDll)" "$(NuGitIntermediateDir)" "$(MSBuildProjectDirectory)\nugitversion.json"</NuGitToolCommand>
+		</PropertyGroup>
+
+		<Error Text="NuGitVersion.Tool.dll not found: $(NuGitToolDll)"
+			   Condition="!Exists('$(NuGitToolDll)')" />
+
+		<Message Text="Generating version info..." Importance="high" />
+		<Message Text="Executing: $(NuGitToolCommand)" Importance="high" />
+
+		<Exec Command="$(NuGitToolCommand)"
+			  WorkingDirectory="$(MSBuildProjectDirectory)"
+			  ConsoleToMSBuild="true">
+			<Output TaskParameter="ExitCode" PropertyName="NuGitToolExitCode" />
+		</Exec>
+
+		<ItemGroup>
+			<Compile Include="$(IntermediateOutputPath)NuGitAssemblyInfo.g.cs" />
+			<FileWrites Include="$(IntermediateOutputPath)NuGitAssemblyInfo.g.cs" />
+		</ItemGroup>
+
+		<Error Text="Version info generation failed with code $(NuGitToolExitCode)"
+			   Condition="'$(NuGitToolExitCode)' != '0'" />
+	</Target>
+</Project>

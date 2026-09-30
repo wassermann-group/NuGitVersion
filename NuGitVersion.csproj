@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netstandard2.0</TargetFramework>
+		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<PackageId>NuGitVersion</PackageId>
+		<Version>2.0.0</Version>
+		<Authors>Wassermann Automation GmbH</Authors>
+		<Company>Wassermann Automation GmbH</Company>
+		<Copyright>Copyright (c) 2026 Wassermann Automation GmbH</Copyright>
+		<Description>Automatic build versioning from Git: combines Major.Minor.Patch from nugitversion.json with git information (commit count, hash, branch, dirty flag) into the assembly version attributes and a generated NuGitAssemblyInfo class for runtime access.</Description>
+		<IncludeBuildOutput>false</IncludeBuildOutput>
+		<DevelopmentDependency>true</DevelopmentDependency>
+		<!-- NU5128 is expected: this is a build-only package without lib/ref assemblies -->
+		<NoWarn>$(NoWarn);NU5128</NoWarn>
+		<PackageTags>version;versioning;git;assemblyinfo;semver;msbuild;build</PackageTags>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/wassermann-group/NuGitVersion</RepositoryUrl>
+		<RepositoryType>git</RepositoryType>
+		<PackageProjectUrl>https://github.com/wassermann-group/NuGitVersion</PackageProjectUrl>
+
+		<ToolProjectPath>$(MSBuildThisFileDirectory)tool\NuGitVersion.Tool\NuGitVersion.Tool.csproj</ToolProjectPath>
+		<ToolTargetFramework>net8.0</ToolTargetFramework>
+		<ToolPublishDir>$(MSBuildThisFileDirectory)tool\NuGitVersion.Tool\bin\$(Configuration)\$(ToolTargetFramework)\publish\</ToolPublishDir>
+	</PropertyGroup>
+
+	<!-- Exclude the tool project sources from this project (it lives inside the SDK default glob) -->
+	<ItemGroup>
+		<Compile Remove="tool\**" />
+		<Content Remove="tool\**" />
+		<None Remove="tool\**" />
+		<EmbeddedResource Remove="tool\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Package readme -->
+		<None Include="README.md" Pack="true" PackagePath="\" />
+
+		<!-- version.json template -->
+		<Content Include="content\nugitversion.json" PackagePath="content\%(Filename)%(Extension)" Pack="true" />
+
+		<!-- MSBuild targets file -->
+		<Content Include="build\NuGitVersion.targets" PackagePath="build\%(Filename)%(Extension)" Pack="true" />
+	</ItemGroup>
+
+	<!-- Publish the tool (NuGitVersion.Tool) before packing -->
+	<Target Name="PublishNuGitTool" BeforeTargets="Build;GenerateNuspec">
+		<Message Text="Publishing NuGitVersion.Tool ($(ToolTargetFramework))..." Importance="high" />
+		<MSBuild Projects="$(ToolProjectPath)"
+				 Targets="Publish"
+				 Properties="Configuration=$(Configuration);TargetFramework=$(ToolTargetFramework)" />
+	</Target>
+
+	<!-- Add the published tool output to the package -->
+	<Target Name="AddNuGitToolToPackage" BeforeTargets="_GetPackageFiles" DependsOnTargets="PublishNuGitTool">
+		<ItemGroup>
+			<_PackageFiles Include="$(ToolPublishDir)**\*.*">
+				<PackagePath>tools\%(RecursiveDir)</PackagePath>
+				<BuildAction>None</BuildAction>
+			</_PackageFiles>
+		</ItemGroup>
+	</Target>
+
+</Project>

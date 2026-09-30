@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="NuGitVersion.csproj" />
+  <Project Path="tool/NuGitVersion.Tool/NuGitVersion.Tool.csproj" />
+</Solution>

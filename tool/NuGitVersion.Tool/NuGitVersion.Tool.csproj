@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<!-- Run on any installed runtime >= 8.0 so consumers don't need exactly this version -->
+		<RollForward>LatestMajor</RollForward>
+		<Nullable>enable</Nullable>
+		<LangVersion>latest</LangVersion>
+		<RootNamespace>NuGitVersion.Tool</RootNamespace>
+		<AssemblyName>NuGitVersion.Tool</AssemblyName>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+
+</Project>
