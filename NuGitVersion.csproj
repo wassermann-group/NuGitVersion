@@ -47,6 +47,11 @@
 	<!-- Publish the tool (NuGitVersion.Tool) before packing -->
 	<Target Name="PublishNuGitTool" BeforeTargets="Build;GenerateNuspec">
 		<Message Text="Publishing NuGitVersion.Tool ($(ToolTargetFramework))..." Importance="high" />
+		<!-- Restore explicitly: the tool is no project reference, so the implicit
+		     restore of dotnet pack/build never covers it (fresh checkouts, CI) -->
+		<MSBuild Projects="$(ToolProjectPath)"
+				 Targets="Restore"
+				 Properties="Configuration=$(Configuration);TargetFramework=$(ToolTargetFramework)" />
 		<MSBuild Projects="$(ToolProjectPath)"
 				 Targets="Publish"
 				 Properties="Configuration=$(Configuration);TargetFramework=$(ToolTargetFramework)" />
