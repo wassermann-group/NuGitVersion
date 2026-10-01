@@ -6,26 +6,29 @@
 		<GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<FilesToCopy Include="$(MSBuildThisFileDirectory)..\content\nugitversion.json"
-					 Condition="!Exists('$(MSBuildProjectDirectory)\nugitversion.json')" />
-	</ItemGroup>
+	<PropertyGroup>
+		<!-- Path of the version file, computed once and used everywhere below.
+		     NormalizePath produces the directory separator of the current platform. A hand-built
+		     "$(MSBuildProjectDirectory)\nugitversion.json" keeps its backslash inside the Exec
+		     command on Linux/macOS and the tool would not find the file.
+		     Can be overridden in the project file. -->
+		<NuGitVersionFile Condition="'$(NuGitVersionFile)' == ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', 'nugitversion.json'))</NuGitVersionFile>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<!-- Include nugitversion.json as AdditionalFile -->
-		<AdditionalFiles Include="$(MSBuildProjectDirectory)\nugitversion.json" />
+		<AdditionalFiles Include="$(NuGitVersionFile)" />
 	</ItemGroup>
 
 	<Target Name="GenerateVersionInfo" BeforeTargets="BeforeCompile">
-		<!-- Copy nugitversion.json if not yet present in the project -->
-		<Copy SourceFiles="@(FilesToCopy)"
-			  DestinationFiles="@(FilesToCopy->'$(MSBuildProjectDirectory)\nugitversion.json')" />
-
 		<PropertyGroup>
 			<NuGitToolDll>$(MSBuildThisFileDirectory)..\tools\NuGitVersion.Tool.dll</NuGitToolDll>
 			<!-- Strip the trailing backslash, otherwise it escapes the closing quote on Windows -->
 			<NuGitIntermediateDir>$(IntermediateOutputPath.TrimEnd('\').TrimEnd('/'))</NuGitIntermediateDir>
-			<NuGitToolCommand>dotnet "$(NuGitToolDll)" "$(NuGitIntermediateDir)" "$(MSBuildProjectDirectory)\nugitversion.json"</NuGitToolCommand>
+			<!-- Missing version file: the tool creates a default 0.1.0 on local builds and fails on
+			     CI builds. NuGitVersionFailIfMissing=true|false overrides that decision. -->
+			<NuGitToolExtraArgs Condition="'$(NuGitVersionFailIfMissing)' != ''">--fail-if-missing=$(NuGitVersionFailIfMissing)</NuGitToolExtraArgs>
+			<NuGitToolCommand>dotnet "$(NuGitToolDll)" "$(NuGitIntermediateDir)" "$(NuGitVersionFile)" $(NuGitToolExtraArgs)</NuGitToolCommand>
 		</PropertyGroup>
 
 		<Error Text="NuGitVersion.Tool.dll not found: $(NuGitToolDll)"

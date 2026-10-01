@@ -4,7 +4,7 @@
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>NuGitVersion</PackageId>
-		<Version>2.0.0</Version>
+		<Version>2.0.1</Version>
 		<Authors>Wassermann Automation GmbH</Authors>
 		<Company>Wassermann Automation GmbH</Company>
 		<Copyright>Copyright (c) 2026 Wassermann Automation GmbH</Copyright>

@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="NuGitVersion.csproj" />
   <Project Path="tool/NuGitVersion.Tool/NuGitVersion.Tool.csproj" />
+  <Project Path="tool/NuGitVersion.Tool.Tests/NuGitVersion.Tool.Tests.csproj" />
 </Solution>

@@ -13,23 +13,44 @@ internal static class Program
     {
         try
         {
-            if (args.Length < 1)
+            var options = VersionLogic.ParseArgs(args, out var argError);
+            if (options is null)
             {
-                Console.Error.WriteLine("Usage: NuGitVersion.Tool <OutputDir> [VersionFile]");
+                Error("NGV005", argError ?? "Invalid arguments");
                 return 2;
             }
 
-            var outputDir = args[0];
-            var versionFile = args.Length >= 2 ? args[1] : "nugitversion.json";
-
             Log("=== NuGitVersion.Tool started ===");
+
+            // Paths may arrive with backslashes on Linux/macOS (see VersionLogic.NormalizePath)
+            var isWindows = OperatingSystem.IsWindows();
+            var outputDir = VersionLogic.NormalizePath(options.OutputDir, isWindows, Directory.Exists);
+            var versionFile = VersionLogic.NormalizePath(options.VersionFile, isWindows, File.Exists);
+            if (!ReferenceEquals(outputDir, options.OutputDir))
+                Log($"Output directory normalized: {options.OutputDir} -> {outputDir}");
+            if (!ReferenceEquals(versionFile, options.VersionFile))
+                Log($"Version file path normalized: {options.VersionFile} -> {versionFile}");
+
             Log($"Output Directory: {outputDir}");
             Log($"Version File:     {versionFile}");
 
-            // 1. Ensure nugitversion.json exists
+            // 1. Detect build server (needed to decide how to treat a missing version file)
+            var env = new Func<string, string?>(Environment.GetEnvironmentVariable);
+            var buildServer = VersionLogic.DetectBuildServer(env);
+            Log($"BuildServer: {buildServer}");
+
+            // 2. Ensure nugitversion.json exists
             if (!File.Exists(versionFile))
             {
-                Log("nugitversion.json not found, creating default version...");
+                if (VersionLogic.ShouldFailIfMissing(buildServer, options.FailIfMissing))
+                {
+                    Error("NGV001", $"{VersionLogic.DefaultVersionFileName} not found at '{versionFile}'. "
+                        + "Commit the file to the repository or set the MSBuild property "
+                        + "NuGitVersionFailIfMissing=false to create a default version on this build server.");
+                    return 1;
+                }
+
+                Log($"{VersionLogic.DefaultVersionFileName} not found, creating default version...");
                 var defaultJson = JsonSerializer.Serialize(
                     new VersionFile { Major = 0, Minor = 1, Patch = 0 },
                     new JsonSerializerOptions { WriteIndented = true });
@@ -40,20 +61,16 @@ internal static class Program
             var version = JsonSerializer.Deserialize<VersionFile>(versionJson, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
-            }) ?? throw new InvalidOperationException("Failed to parse nugitversion.json!");
+            }) ?? throw new InvalidOperationException($"Failed to parse {VersionLogic.DefaultVersionFileName}!");
 
             if (version.Major is null || version.Minor is null || version.Patch is null)
-                throw new InvalidOperationException("nugitversion.json must contain Major, Minor and Patch!");
+                throw new InvalidOperationException($"{VersionLogic.DefaultVersionFileName} must contain Major, Minor and Patch!");
 
             Log($"Version: {version.Major}.{version.Minor}.{version.Patch}");
 
-            // 2. Check git availability
+            // 3. Check git availability
             if (!TryRunGit("--version", out _))
                 throw new InvalidOperationException("Git is not installed or not in PATH");
-
-            // 3. Detect build server
-            var buildServer = DetectBuildServer();
-            Log($"BuildServer: {buildServer}");
 
             // 4. Collect git information
             if (!TryRunGit("rev-parse --show-toplevel", out var repoRoot) || string.IsNullOrWhiteSpace(repoRoot))
@@ -61,16 +78,24 @@ internal static class Program
 
             TryRunGit("rev-parse --short HEAD", out var gitHash);
             TryRunGit("show -s --format=%ci HEAD", out var commitTime);
-            TryRunGit("rev-parse --abbrev-ref HEAD", out var branch);
+            TryRunGit("rev-parse --abbrev-ref HEAD", out var gitBranch);
             TryRunGit("rev-list --count HEAD", out var commitCountStr);
             TryRunGit("status --porcelain", out var porcelain);
 
             if (TryRunGit("rev-parse --is-shallow-repository", out var isShallow)
                 && string.Equals(isShallow, "true", StringComparison.OrdinalIgnoreCase))
             {
-                Log("WARNING: Shallow clone detected - the commit count only reflects the cloned "
+                Warn("NGV003", "Shallow clone detected - the commit count only reflects the cloned "
                     + "commits and will not increase across builds. Configure your CI to clone the "
                     + "full history (e.g. fetch-depth: 0 on GitHub Actions, 'clone: depth: full' on Bitbucket).");
+            }
+
+            // 5. Branch: CI variable first, git second, never the literal "HEAD"
+            var branch = VersionLogic.ResolveBranch(buildServer, env, gitBranch);
+            if (branch.Length == 0)
+            {
+                Warn("NGV002", "Detached HEAD and no branch variable of the build server found; "
+                    + "the branch is left empty.");
             }
 
             var uncommittedCount = string.IsNullOrWhiteSpace(porcelain)
@@ -88,10 +113,10 @@ internal static class Program
             Log($"UncommittedChanges: {uncommittedCount}");
             Log($"Dirty:              {dirtySuffix}");
 
-            // 5. Ensure output directory exists
+            // 6. Ensure output directory exists
             Directory.CreateDirectory(outputDir);
 
-            // 6. Write nugitinfo.json
+            // 7. Write nugitinfo.json
             var info = new Dictionary<string, object?>
             {
                 ["Major"] = version.Major,
@@ -111,10 +136,10 @@ internal static class Program
                 new UTF8Encoding(false));
             Log($"nugitinfo.json written: {infoPath}");
 
-            // 7. Generate NuGitAssemblyInfo.g.cs
+            // 8. Generate NuGitAssemblyInfo.g.cs
             var assemblyVersion = $"{version.Major}.{version.Minor}.{version.Patch}.0";
             var fileVersion = $"{version.Major}.{version.Minor}.{version.Patch}.{commitCount}";
-            var infoVersion = $"{fileVersion}-{branch}+{gitHash}{dirtySuffix}";
+            var infoVersion = VersionLogic.BuildInformationalVersion(fileVersion, branch, gitHash, dirtySuffix);
 
             var cs = $@"// <auto-generated/>
 using System.Reflection;
@@ -146,29 +171,10 @@ public static partial class NuGitAssemblyInfo
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"ERROR: {ex.Message}");
+            Error("NGV004", ex.Message);
             Console.Error.WriteLine(ex.StackTrace);
             return 1;
         }
-    }
-
-    private static string DetectBuildServer()
-    {
-        static string? E(string name) => Environment.GetEnvironmentVariable(name);
-
-        if (string.Equals(E("TF_BUILD"), "True", StringComparison.OrdinalIgnoreCase))
-            return "Azure";
-        if (string.Equals(E("GITHUB_ACTIONS"), "true", StringComparison.OrdinalIgnoreCase))
-            return "GitHub";
-        if (!string.IsNullOrEmpty(E("BITBUCKET_BUILD_NUMBER")))
-            return "BitBucket";
-        if (string.Equals(E("GITLAB_CI"), "true", StringComparison.OrdinalIgnoreCase))
-            return "GitLab";
-        if (!string.IsNullOrEmpty(E("JENKINS_URL")))
-            return "Jenkins";
-        if (string.Equals(E("CI"), "true", StringComparison.OrdinalIgnoreCase))
-            return "Other";
-        return "Local";
     }
 
     private static bool TryRunGit(string arguments, out string output)
@@ -210,6 +216,18 @@ public static partial class NuGitAssemblyInfo
     private static void Log(string message)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {message}");
+    }
+
+    // Warnings and errors use MSBuild's canonical format ("warning CODE: text") without the
+    // timestamp prefix, so the Exec task reports them as real build warnings/errors.
+    private static void Warn(string code, string message)
+    {
+        Console.WriteLine($"warning {code}: {message}");
+    }
+
+    private static void Error(string code, string message)
+    {
+        Console.Error.WriteLine($"error {code}: {message}");
     }
 
     private sealed class VersionFile

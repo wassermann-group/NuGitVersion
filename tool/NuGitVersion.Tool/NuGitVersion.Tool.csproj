@@ -12,4 +12,8 @@
 		<IsPackable>false</IsPackable>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="NuGitVersion.Tool.Tests" />
+	</ItemGroup>
+
 </Project>
