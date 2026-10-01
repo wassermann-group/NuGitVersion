@@ -4,11 +4,11 @@
 		<TargetFramework>netstandard2.0</TargetFramework>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<PackageId>NuGitVersion</PackageId>
-		<Version>2.0.1</Version>
+		<Version>2.1.0</Version>
 		<Authors>Wassermann Automation GmbH</Authors>
 		<Company>Wassermann Automation GmbH</Company>
 		<Copyright>Copyright (c) 2026 Wassermann Automation GmbH</Copyright>
-		<Description>Automatic build versioning from Git: combines Major.Minor.Patch from nugitversion.json with git information (commit count, hash, branch, dirty flag) into the assembly version attributes and a generated NuGitAssemblyInfo class for runtime access.</Description>
+		<Description>Automatic build versioning from Git: combines Major.Minor.Patch from nugitversion.json with git information (commit count, hash, branch, dirty flag, remote URL) into the assembly version attributes and a generated NuGitAssemblyInfo class for runtime access.</Description>
 		<IncludeBuildOutput>false</IncludeBuildOutput>
 		<DevelopmentDependency>true</DevelopmentDependency>
 		<!-- NU5128 is expected: this is a build-only package without lib/ref assemblies -->

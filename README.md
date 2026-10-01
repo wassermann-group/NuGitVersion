@@ -4,7 +4,7 @@ Automatic build versioning from Git — simple and transparent.
 
 NuGitVersion combines a manually maintained base version (`Major.Minor.Patch` from a
 `nugitversion.json` in your project) with information from the underlying Git repository
-(commit count, commit hash, branch, dirty flag) and stamps the result into your assembly
+(commit count, commit hash, branch, dirty flag, remote URL) and stamps the result into your assembly
 at build time. It also generates a static `NuGitAssemblyInfo` class so the same
 information is available at runtime.
 
@@ -54,10 +54,13 @@ Console.WriteLine(NuGitAssemblyInfo.Branch);       // "main"
 Console.WriteLine(NuGitAssemblyInfo.CommitCount);  // 42
 Console.WriteLine(NuGitAssemblyInfo.IsDirty);      // false
 Console.WriteLine(NuGitAssemblyInfo.BuildServer);  // "Local", "GitHub", "Azure", ...
+Console.WriteLine(NuGitAssemblyInfo.RepositoryUrl);    // "https://github.com/org/repo.git"
+Console.WriteLine(NuGitAssemblyInfo.RepositoryWebUrl); // "https://github.com/org/repo"
 ```
 
 Detected build servers: Azure Pipelines, GitHub Actions, Bitbucket Pipelines, GitLab CI,
-Jenkins (plus a generic `CI` fallback).
+Jenkins (plus a generic `CI` fallback). `RepositoryUrl` and `RepositoryWebUrl` are empty
+when the repository has no remote; see [Repository URL](#repository-url) for the rules.
 
 ## Continuous integration
 
@@ -78,6 +81,35 @@ server's environment first and only falls back to Git if no variable is set:
 The literal `HEAD` is never used as a branch name. If neither a variable nor Git yields a
 branch, the branch is left empty, the tool emits warning `NGV002`, and the informational
 version is written without the `-Branch` part.
+
+### Repository URL
+
+`NuGitAssemblyInfo.RepositoryUrl` is the URL of the remote `origin` (or of the first remote
+if there is no `origin`). If Git reports no remote at all, the tool falls back to the build
+server's environment:
+
+| Build server | Variables |
+|---|---|
+| GitHub Actions (also Forgejo/Gitea Actions) | `GITHUB_SERVER_URL` + `/` + `GITHUB_REPOSITORY` |
+| Azure Pipelines | `BUILD_REPOSITORY_URI` |
+| GitLab CI | `CI_PROJECT_URL` |
+| Bitbucket Pipelines | `BITBUCKET_GIT_HTTP_ORIGIN` |
+| Jenkins | `GIT_URL` |
+
+Credentials are always removed before the URL is embedded. CI checkouts often carry a token
+in the remote URL (`https://gitlab-ci-token:TOKEN@gitlab.com/...`), local clones a user name
+or personal access token; the whole user part is stripped, so
+`https://user:token@github.com/org/repo.git` becomes `https://github.com/org/repo.git`.
+Apart from that the URL is kept as Git reports it (SSH stays SSH, `.git` stays).
+
+`NuGitAssemblyInfo.RepositoryWebUrl` is a best-effort browsable variant: `ssh://`, `git://`
+and `git@host:org/repo.git` become `https://host/org/repo`, a trailing `.git` is removed,
+`http(s)` URLs keep their scheme and port. It is empty for `file://` URLs and local paths.
+There are no host-specific rules, so the result is wrong for servers whose web and SSH paths
+differ (Azure DevOps SSH URLs, for example). Use `RepositoryUrl` in that case.
+
+Both values end up in the compiled assembly. If the remote URL points to an internal host
+you do not want to disclose, keep that in mind when shipping binaries built from such a clone.
 
 ### Missing `nugitversion.json`
 
