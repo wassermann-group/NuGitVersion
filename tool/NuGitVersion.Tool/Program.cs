@@ -77,6 +77,7 @@ internal static class Program
                 throw new InvalidOperationException("No git repository found!");
 
             TryRunGit("rev-parse --short HEAD", out var gitHash);
+            TryRunGit("rev-parse HEAD", out var gitHashFull);
             TryRunGit("show -s --format=%ci HEAD", out var commitTime);
             TryRunGit("rev-parse --abbrev-ref HEAD", out var gitBranch);
             TryRunGit("rev-list --count HEAD", out var commitCountStr);
@@ -123,6 +124,7 @@ internal static class Program
             var repositoryWebUrl = VersionLogic.ToWebUrl(repositoryUrl);
 
             Log($"Git Hash:           {gitHash}");
+            Log($"Git Hash (full):    {gitHashFull}");
             Log($"Branch:             {branch}");
             Log($"CommitCount:        {commitCount}");
             Log($"CommitTime:         {commitTime}");
@@ -141,6 +143,7 @@ internal static class Program
                 ["Minor"] = version.Minor,
                 ["Patch"] = version.Patch,
                 ["CommitHash"] = gitHash,
+                ["CommitHashFull"] = gitHashFull,
                 ["CommitTime"] = commitTime,
                 ["Branch"] = branch,
                 ["IsDirty"] = dirtySuffix,
@@ -176,6 +179,7 @@ public static partial class NuGitAssemblyInfo
     public const int Minor = {version.Minor};
     public const int Patch = {version.Patch};
     public const string CommitHash = {Lit(gitHash)};
+    public const string CommitHashFull = {Lit(gitHashFull)};
     public const string CommitTime = {Lit(commitTime)};
     public const string Branch = {Lit(branch)};
     public const int CommitCount = {commitCount};

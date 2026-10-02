@@ -50,6 +50,7 @@ The generated static class exposes everything from code:
 ```csharp
 Console.WriteLine($"{NuGitAssemblyInfo.Major}.{NuGitAssemblyInfo.Minor}.{NuGitAssemblyInfo.Patch}");
 Console.WriteLine(NuGitAssemblyInfo.CommitHash);   // "a1b2c3d"
+Console.WriteLine(NuGitAssemblyInfo.CommitHashFull); // "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
 Console.WriteLine(NuGitAssemblyInfo.Branch);       // "main"
 Console.WriteLine(NuGitAssemblyInfo.CommitCount);  // 42
 Console.WriteLine(NuGitAssemblyInfo.IsDirty);      // false
